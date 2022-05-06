@@ -1,0 +1,548 @@
+//David Martinez
+
+//Example of C++ for school project involving classes, stack and pointers. The code was orginally three seprate files that would combine together to run. 
+//The first was the header,second was support page, third was the main code file. Some of the code was provied by our professor which are the first two classes in the header file, token and token reader.
+//Rest should have been typed by me. Notes help describe what was going on.
+
+
+//This is the header file
+#include <cstdio>
+#include <cstring>
+#include <cctype>
+
+// Enumarated Type specifying all of the Tokens
+enum TokenType{
+    ERROR, OPERATOR, VALUE, EOLN, QUIT, HELP, EOFILE
+};//enum TokenType
+
+// Class to hold the Token information
+class Token{
+    private:
+        TokenType type;
+        char      op;       // using '$' as undefined/error
+        int       val;      // using -999 as undefined/error
+    
+    public:
+    
+        // Default to initialize to the ERROR TokenType
+        Token(){
+            type = ERROR;
+            op = '$';
+            val = -999;
+        }// Token()
+        
+        // Initialize to a specific TokenType
+        Token (TokenType t){
+            type = t;
+            op = '$';
+            val = -999;
+        }//Token (TokenType t)
+        
+        // Set to a specific TokenType
+        void setToType(TokenType t){
+            type = t;
+            op = '$';
+            val = -999;
+        }//void setToType(TokenType t)
+        
+        // Set to a OPERATOR TokenType with specific operator value
+        void setToOperator(char c){
+            type = OPERATOR;
+            op = c;
+            val = -999;
+        }//void setToOperator(char c)
+        
+        // Set to a VALUE TokenType with a specific numeric value
+        void setToValue(int v){
+            type = VALUE;
+            op = '$';
+            val = v;
+        }//  void setToValue(int v)
+        
+        // return true if the Current Token is of the given TokenType
+        bool equalsType(TokenType t){
+            if (type == t)
+                return true;
+            else
+                return false;
+        }//bool equalsType(TokenType t)
+        
+        // return true if the Current Token is of the OPERATOR TokenType
+        //     and contains the given operator character
+        bool equalsOperator(char c){
+            if (type == OPERATOR && op == c)
+                return true;
+            else
+                return false;
+        }//bool equalsOperator(char c)
+        
+        // Return the Operator for the current Token
+        //   verify the current Token is of the OPERATOR TokenType
+        char getOperator (){
+            if (type == OPERATOR)
+                return op;
+            else
+                return '$';   // using $ to indicate an error value
+        }//char getOperator ()
+        
+        // Return the Value for the current Token
+        //   verify the current token is of the value TokenType
+        int getValue(){
+            if (type == VALUE)
+                return val;
+            else
+                return -999;  // using -999 to indicate an error value
+        }//int getValue()
+};//class Token
+
+
+class TokenReader{
+    private:
+        char inputline[300];  // this assumes that all input lines are 300 characters or less in length
+        bool needline;
+        int pos;
+    
+    
+    public:
+    
+        // initialize the TokenReader class to read from Standard Input
+        TokenReader(){
+            // set to read from Standard Input
+            inputline[0] = '\0';
+            pos = 0;
+            needline = true;
+        }//TokenReader()
+        
+        // Force the next getNextToken to read in a line of input
+        void clearToEoln(){
+            needline = true;
+        }//void clearToEoln()
+        
+        // Return the next Token from the input line
+        Token getNextToken() {
+            char* endCheck;
+            
+            //printf ("getToken %d, %d, %s\n", pos, needline, inputline);
+            
+            // get a new line of input from user
+            if (needline){
+                endCheck = fgets ( inputline, 300, stdin);
+                
+                if (endCheck == NULL ){
+                    printf ("Error in reading");
+                    Token t(EOFILE);
+                    return t;
+                }
+                
+                for (int i = 0 ; i < strlen(inputline) ; i++)
+                    if ('\n' == inputline[i])
+                    inputline[i] = ' ';
+                    strcat (inputline , " ");    // add a space at end to help deal with digit calculation
+                    needline = false;
+                    pos = 0;
+            }
+            
+            // skip over any white space characters in the beginning of the input
+            while ( pos < strlen(inputline) && isspace(inputline[pos]) ){
+                pos++;
+            }
+            
+            // check for the end of the current line of input
+            if (pos >= strlen(inputline)){ // at end of line
+                needline = true;
+                Token t(EOLN);
+                return t;
+            }
+            
+            // Get the next character from the input line
+            char ch = inputline[pos]; pos++;
+            
+            // check if 'q' or 'Q' was entered ==> QUIT Token
+            if ( 'q' == ch || 'Q' == ch ){
+                return Token (QUIT);
+            }
+            
+            // check if "?" was entered ==> HELP Token
+            if ( '?' == ch ){
+                return Token (HELP);
+            }
+            
+            // check for Operator values of: + - * / ( )  ==> OPERATOR Token
+            if ( ('+' == ch) || ('-' == ch) || ('*' == ch) ||
+            ('/' == ch) || ('(' == ch) || (')' == ch) ){
+                Token t;
+                t.setToOperator( ch );
+                return t;
+            }
+            
+            // check for a number  ==> VALUE Token
+            if (isdigit(ch)){
+                int number = int (ch) - int('0');  // subtract ascii value of ch from ascii value of '0'
+                ch = inputline[pos]; pos++;
+                while (isdigit(ch)){
+                    number = number * 10 + int (ch) - int('0');
+                    ch = inputline[pos]; pos++;
+                }
+                pos--; // since number calcuation check one character after the last digit
+                Token t;
+                t.setToValue( number );
+                return t;
+            }
+            
+            // Input in not valid if code get to this part ==> ERROR Token
+            return Token (ERROR);
+        }//Token getNextToken() 
+
+};//class TokenReader
+
+class valuestack{
+    private:
+        int *valstack;
+        int sizeofstack;
+        int topofstack;
+        void grow();
+           
+    public:
+        valuestack();
+        
+        void printstack();
+        
+        bool isEmpty ( );
+        
+        void push (int data);
+        
+        int top();
+        
+        void pop();
+        
+        void reset();
+
+};//class valuestack
+
+class opprendstack{
+    private:
+        char *opstack;
+        int sizeofstack;
+        int topofstack;
+        
+        void grow();
+    public:
+    
+        opprendstack();
+    
+        void printstack();
+       
+        bool isEmpty ( ); 
+        
+        void push (char data);
+        
+        char top();
+        
+        void pop();
+        
+        void reset();
+
+};//class opprendstack
+
+
+
+
+
+//Serprate but connected file
+
+
+#include "pro5h.h"
+
+void valuestack::grow(){
+    sizeofstack=sizeofstack+2;//increases the number of what size will be
+    int *temp;//creat and assign temp
+    temp=new int [sizeofstack];
+    temp= valstack;
+    valstack = new int [sizeofstack];//grow the actuall main stack then copy from temp
+    int i=0;
+    for(i=0;i<sizeofstack;i++){
+        valstack[i]=temp[i];
+    }
+    delete [] temp;
+}
+
+valuestack::valuestack(){//default values for stack
+    sizeofstack=2;
+    topofstack=-1;
+    valstack=new int [sizeofstack];
+}
+
+void valuestack::printstack(){//prints stack
+    int i;
+    for(i=0;i<=topofstack;i++){
+        printf ("%d. %d\n",i+1,valstack[i]); 
+    }
+}
+
+bool valuestack::isEmpty ( ){//checks if stack is empty
+    if(topofstack<0){
+        return true;
+    }
+    return false;
+}  
+
+void valuestack::push (int data){//push data on stack unless stack is at limit
+    topofstack++;
+    if(topofstack>=sizeofstack){
+        grow();
+    }
+    valstack[topofstack]=data;
+
+}
+
+int valuestack::top(){//returns value at top of stack
+    return valstack[topofstack];
+}
+
+void valuestack::pop(){//pop off top of stack
+    topofstack=topofstack-1;  
+}
+
+void valuestack::reset(){//empty stack
+    delete [] valstack;
+}
+
+void opprendstack::grow(){
+    sizeofstack=sizeofstack+2;//increases the number of what size will be
+    char *temp;//creat and assign temp
+    temp=new char [sizeofstack];
+    temp= opstack;
+    opstack = new char [sizeofstack];//grow the actuall main stack then copy from temp
+    int i=0;
+    for(i=0;i<sizeofstack;i++){
+        opstack[i]=temp[i];
+    }
+    delete [] temp;
+}
+
+opprendstack::opprendstack(){
+    sizeofstack=2;
+    topofstack=-1;
+    opstack=new char [sizeofstack];
+}
+
+void opprendstack::printstack(){
+    int i;
+    for(i=0;i<=topofstack;i++){
+        printf ("%d. %c\n",i+1,opstack[i]); 
+    }
+}
+
+bool opprendstack::isEmpty ( ){
+    if(topofstack<0){
+        return true;
+    }
+    return false;
+}   
+
+void opprendstack::push (char data){
+    topofstack++;
+    if(topofstack>=sizeofstack){
+        grow();
+    }
+    opstack[topofstack]=data;
+}
+
+char opprendstack::top(){
+    return opstack[topofstack];
+}
+
+void opprendstack::pop(){
+    topofstack=topofstack-1;  
+}
+
+void opprendstack::reset(){
+    delete [] opstack;
+}
+
+
+
+
+
+
+//Main file
+
+
+#include "pro5h.h"
+
+void printCommands(){
+    printf ("The commands for this program are:\n\n");
+    printf ("q - to quit the program\n");
+    printf ("? - to list the accepted commands\n");
+    printf ("or any infix mathematical expression using operators of (), *, /, +, -\n");
+}//void printCommands()
+
+
+
+
+void processExpression (Token inputToken, TokenReader *tr, bool debugmode);
+
+int evaluate(char op,int val1,int val2){//evaluate equation
+    int val3;
+    if(op=='+'){//depending on opprend the expression is evaluated
+    val3=val1+val2;  
+    }
+    else if(op=='-'){
+    val3=val1-val2;
+    }
+    else if(op=='*'){
+    val3=val1*val2;  
+    }
+    else if(op=='/'){
+    val3=val1/val2;  
+    }
+    else if(op=='('){
+    printf ("Error in evaluate ( found\n "); 
+    }
+    
+    return val3;
+}//int evaluate(char op,int val1,int val2)
+
+void popandevaluate(valuestack& vstack,opprendstack& ostack){//pops stack and does the equation
+    char op=ostack.top();
+    ostack.pop();
+    int val2=vstack.top();
+    vstack.pop();
+    int val1=vstack.top();
+    vstack.pop();
+    int val3=evaluate(op,val1,val2);
+    vstack.push(val3);
+}//void popandevaluate(valuestack& vstack,opprendstack& ostack)
+
+int main(int argc, char *argv[]){
+    /***************************************************************/
+    /* Add code for checking command line arguments for debug mode */
+    
+    
+    Token inputToken;
+    TokenReader tr;
+    bool debugmode=false;
+    printf ("Starting Expression Evaluation Program\n\n");
+    printf ("Enter Expression: ");
+    int w;
+    for(w=0;w<argc;w++){//loop checks all command line arguments last file found is opened
+        if(  strcmp (argv[w], "-d") == 0  ){
+            printf ( "DEBUGMODE ACTIVATED\n");
+            debugmode=true;
+        }
+    }
+    
+    inputToken = tr.getNextToken ();
+    
+    while (inputToken.equalsType(QUIT) == false){
+        /* check first Token on Line of input */
+        if(inputToken.equalsType(HELP)){
+            printCommands();
+            tr.clearToEoln();
+        }
+        else if(inputToken.equalsType(ERROR)){
+            printf ("Invalid Input - For a list of valid commands, type ?\n");
+            tr.clearToEoln();
+        }
+        else if(inputToken.equalsType(EOLN)){
+            printf ("Blank Line - Do Nothing\n");
+            /* blank line - do nothing */
+        }
+        else{
+            processExpression(inputToken, &tr,debugmode);
+        }
+        
+        printf ("\nEnter Expression: ");
+        inputToken = tr.getNextToken ();
+    }//while (inputToken.equalsType(QUIT) == false)
+    
+    
+    printf ("Quitting Program\n");
+    return 1;
+}//int main(int argc, char *argv[])
+
+void processExpression (Token inputToken, TokenReader *tr, bool debugmode){
+    /**********************************************/
+    /* Declare both stack head pointers here      */
+    valuestack vstack;
+    opprendstack ostack;
+    /* Loop until the expression reaches its End */
+    while (inputToken.equalsType(EOLN) == false){
+        
+        /* The expression contain a VALUE */
+        if (inputToken.equalsType(VALUE)){
+            /* make this a debugMode statement */
+            if(debugmode==true){
+                printf ("Val: %d, ", inputToken.getValue() );
+            }
+            // add code to perform this operation here
+            vstack.push(inputToken.getValue());
+        
+        }
+        
+        /* The expression contains an OPERATOR */
+        else if (inputToken.equalsType(OPERATOR)){
+            /* make this a debugMode statement */
+            if(debugmode==true){
+                printf ("OP: %c, ", inputToken.getOperator() );
+            }
+            
+            if(inputToken.getOperator()=='('){
+                ostack.push(inputToken.getOperator());  
+            }
+            
+            if(inputToken.getOperator()=='+'||inputToken.getOperator()=='-'){
+                while(ostack.isEmpty()!=true&&ostack.top()!='('){
+                    popandevaluate(vstack,ostack);
+                }
+                ostack.push(inputToken.getOperator());
+            }
+            
+            if(inputToken.getOperator()=='/'||inputToken.getOperator()=='*'){
+                while ( ostack.isEmpty()!=true &&(ostack.top()=='/'||ostack.top()=='*') ){
+                    popandevaluate(vstack,ostack);
+                }
+                ostack.push(inputToken.getOperator());
+            }
+        
+            if(inputToken.getOperator()==')'){
+                while ( ostack.isEmpty()!=true && ostack.top()!='(' ){
+                    popandevaluate(vstack,ostack);
+                }
+                if(ostack.isEmpty()==true){
+                    printf ("ERROR IN ')' section ");
+                }
+                else{
+                    ostack.pop();
+                }
+            }
+            
+            // add code to perform this operation here
+            
+        
+        }//else if (inputToken.equalsType(OPERATOR))
+        
+        /* get next token from input */
+        inputToken = tr->getNextToken ();
+    }// while (inputToken.equalsType(EOLN) == false)
+    
+    while(ostack.isEmpty()!=true){
+        popandevaluate(vstack,ostack);    
+    }
+    printf ("Final result:%d\n",vstack.top());
+    vstack.pop();
+    if(vstack.isEmpty()!=true){
+        printf ("ERROR FINAL STACK NOT EMPTY ");
+    }
+    /* The expression has reached its end */
+    printf ("\n");
+    printf ("\n");
+    //vstack.printstack();
+    printf ("\n");
+    //ostack.printstack();
+    // add code to perform this operation here
+    vstack.reset();//EMPTY stacks
+    ostack.reset();
+    printf ("\n");
+}//void processExpression (Token inputToken, TokenReader *tr)
+
